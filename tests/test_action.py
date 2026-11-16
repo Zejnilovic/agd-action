@@ -42,7 +42,11 @@ printf '%s\\n' "$*" >> "$FAKE/gh.log"
 case "$*" in
   "api graphql --input - --jq "*) cat > "$FAKE/graphql.json"; cat "$FAKE/oid" ;;
   "api repos/owner/repo/git/ref/heads/"*) [ -f "$FAKE/branch-exists" ] ;;
-  "pr list "*) [ -f "$FAKE/pr" ] && cat "$FAKE/pr" || true ;;
+  # The open pull requests are $FAKE/prs.json (none by default), filtered with the real --jq expression.
+  "pr list "*)
+    while [ "$1" != --jq ]; do shift; done
+    [ -f "$FAKE/prs.json" ] || echo '[]' > "$FAKE/prs.json"
+    jq -r "$2" "$FAKE/prs.json" ;;
   "pr create "*) touch "$FAKE/pr-created"; echo "https://github.com/owner/repo/pull/13" ;;
 esac
 """
@@ -224,7 +228,6 @@ class UpdateTest(ScriptCase):
         self.assertEqual(run(["git", "rev-parse", "HEAD"], self.project).stdout.strip(), self.base)
 
     def test_a_new_branch_gets_a_pull_request(self):
-        (self.fake / "pr").write_text("")
         self.assertEqual(self.script("update.sh").returncode, 0)
         calls = self.log("gh")
         refs = "api -X POST repos/owner/repo/git/refs"
@@ -236,7 +239,7 @@ class UpdateTest(ScriptCase):
 
     def test_an_existing_branch_moves_and_its_pull_request_is_updated(self):
         (self.fake / "branch-exists").touch()
-        (self.fake / "pr").write_text("12\thttps://github.com/owner/repo/pull/12\n")
+        (self.fake / "prs.json").write_text('[{"number": 12, "url": "https://github.com/owner/repo/pull/12"}]')
         self.assertEqual(self.script("update.sh").returncode, 0)
         calls = self.log("gh")
         self.assertIn("api -X PATCH repos/owner/repo/git/refs/heads/agd-update -f sha=c0ffee -F force=true", calls)

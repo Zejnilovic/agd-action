@@ -44,7 +44,7 @@ The pull request's body is what `agd update` printed. Read it before you merge: 
 
 | Output | Value |
 | --- | --- |
-| `due` | `true` when an update is due, else `false`. Files your project edited count as due, though the update leaves them alone. |
+| `due` | `true` when `agd status --check` reports an update due, else `false`. A file your project edited that has a newer version counts, though the update leaves it alone. |
 | `pr-number` | The pull request opened or updated, if any. |
 | `pr-url` | Its URL. |
 

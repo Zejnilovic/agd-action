@@ -60,7 +60,8 @@ fi
   fi
 } > "$RUNNER_TEMP/body.md"
 
-pr=$(gh pr list --head "$BRANCH" --state open --json number,url --jq '.[0] | "\(.number)\t\(.url)"')
+# "// empty": with no open pull request, .[0] is null, and the string would read "null<tab>null".
+pr=$(gh pr list --head "$BRANCH" --state open --json number,url --jq '.[0] // empty | "\(.number)\t\(.url)"')
 if [ -n "$pr" ]; then
   number=${pr%%$'\t'*} url=${pr#*$'\t'}
   gh pr edit "$number" --body-file "$RUNNER_TEMP/body.md" > /dev/null

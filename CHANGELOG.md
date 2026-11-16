@@ -6,4 +6,4 @@ Version numbers follow agd's: a new agd patch release makes a patch release of t
 
 ## 1.0.0 (unreleased)
 
-- The first release. `uses: Zejnilovic/agd-action@v1` runs `agd update` with agd 0.5.2 and opens or updates a pull request from `agd-update`, committed through GitHub's API so the commit is signed. Inputs `mode`, `branch` and `token`; outputs `due`, `pr-number` and `pr-url`. It replaces the workflow that agd's [automatic-updates guide](https://zejnilovic.github.io/agd/guides/automatic-updates/) had you copy.
+- The first release. `uses: Zejnilovic/agd-action@v1` runs `agd update` with the agd release it pins and opens or updates a pull request from `agd-update`, committed through GitHub's API so the commit is signed. Inputs `mode`, `branch` and `token`; outputs `due`, `pr-number` and `pr-url`. It replaces the workflow that agd's [automatic-updates guide](https://zejnilovic.github.io/agd/guides/automatic-updates/) had you copy.

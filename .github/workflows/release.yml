@@ -1,0 +1,96 @@
+name: Release
+
+# Releases the one "(unreleased)" entry of CHANGELOG.md: dates it, tags the release commit v<version>, moves the
+# major tag (v1) to it, and creates the GitHub release. Then it runs the action from the major tag.
+# Start it from the Actions tab. A dry run does everything but push, and shows the notes.
+# The Marketplace listing isn't automated: GitHub documents no API for it (see the summary).
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Prepare the release and show the notes, but push nothing
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+
+jobs:
+  release:
+    # Release only from the default branch, never from a feature branch.
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Checks before release
+        run: |
+          for script in scripts/*.sh; do bash -n "$script"; done
+          python3 -m unittest discover -s tests
+      - name: Date the changelog entry and write the notes
+        id: prepare
+        run: |
+          NOTES="$RUNNER_TEMP/notes.md"
+          version=$(bash scripts/release.sh --notes "$NOTES")
+          if git rev-parse -q --verify "refs/tags/v$version" > /dev/null; then echo "v$version is already released"; exit 1; fi
+          { echo "VERSION=$version"; echo "MAJOR=v${version%%.*}"; echo "NOTES=$NOTES"; } >> "$GITHUB_ENV"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Commit and tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git commit -q -am "Release $VERSION"
+          git tag -a "v$VERSION" -m "Release $VERSION"
+          git tag -f "$MAJOR" HEAD
+          { echo "## Release notes for $VERSION"; echo; cat "$NOTES"; echo
+            echo "Tags: \`v$VERSION\`, and \`$MAJOR\` moves to it."; echo
+            echo "## Marketplace"; echo
+            echo "To list this version, edit the release on GitHub, tick **Publish this Action to the GitHub Marketplace** and click **Update release**. \`@$MAJOR\` and commit pins work without it."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Push the commit and tags
+        if: ${{ !inputs.dry_run }}
+        run: git push --atomic origin "HEAD:$GITHUB_REF_NAME" "refs/tags/v$VERSION" "+refs/tags/$MAJOR"
+      - name: Create the GitHub release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v$VERSION" --verify-tag --title "$VERSION" --notes-file "$NOTES"
+
+  verify:
+    # Runs the action the way projects do, from the major tag, on a project set up with agentic-defaults.
+    # On a new major version, change @v1 below.
+    needs: release
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: Zejnilovic/agd-action
+          ref: v1
+          path: action
+      - name: Install agd
+        run: bash action/scripts/install.sh
+      - name: Set up a project
+        run: |
+          git init -q
+          agd init --yes
+      - name: Check mode
+        id: check
+        uses: Zejnilovic/agd-action@v1
+        with:
+          mode: check
+      - name: Outputs
+        env:
+          DUE: ${{ steps.check.outputs.due }}
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          [ "$DUE" = false ] || { echo "::error::Expected nothing due, got due=$DUE"; exit 1; }
+          echo "agd-action $VERSION from @v1 runs $(agd --version)."

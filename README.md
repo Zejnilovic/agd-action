@@ -78,6 +78,16 @@ updates:
 - **Runners.** GitHub's Linux and macOS runners have what the action needs: bash, git, curl, jq and gh. A self-hosted runner needs them too.
 - **Only allowed actions.** If your organization runs only actions it allows, fork this repository into it and use the fork.
 
+## Releasing
+
+Only the maintainer releases. Describe the change in a `## <version> (unreleased)` entry of `CHANGELOG.md`, push it to `main`, then run the **Release** workflow, first as a dry run:
+
+```bash
+gh workflow run release.yml -f dry_run=true
+```
+
+It runs the tests, dates the entry, tags `v<version>`, moves the major tag (`v1`) to it, creates the GitHub release, and then runs the action from `@v1`. To list the version on the Marketplace, edit the release and tick **Publish this Action to the GitHub Marketplace**: GitHub has no API for it.
+
 ## License
 
 MIT

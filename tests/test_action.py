@@ -273,5 +273,49 @@ class UpdateTest(ScriptCase):
         self.assertEqual(self.log("gh")[-1], "api -X DELETE repos/owner/repo/git/refs/heads/agd-update-tmp-7-1")
 
 
+class ReleaseTest(unittest.TestCase):
+    """scripts/release.sh, which the Release workflow runs."""
+
+    CHANGELOG = "# Changelog\n\nWhat changed.\n\n## 1.2.0 (unreleased)\n\n- Newer agd.\n- Faster.\n\n## 1.1.0 (2026-01-01)\n\n- Old.\n"
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = pathlib.Path(self._tmp.name)
+        (self.root / "scripts").mkdir()
+        shutil.copy(REPO / "scripts/release.sh", self.root / "scripts")
+        self.changelog = self.root / "CHANGELOG.md"
+        self.changelog.write_text(self.CHANGELOG)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def release(self):
+        return run([BASH, "scripts/release.sh", "--date", "2026-02-02", "--notes", "notes.md"], self.root)
+
+    def test_dates_the_entry_and_writes_its_notes(self):
+        result = self.release()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "1.2.0")
+        self.assertIn("\n## 1.2.0 (2026-02-02)\n", self.changelog.read_text())
+        self.assertNotIn("unreleased", self.changelog.read_text())
+        self.assertEqual((self.root / "notes.md").read_text(), "- Newer agd.\n- Faster.\n")
+
+    def test_refuses_a_changelog_it_cant_release(self):
+        cases = {
+            "no unreleased entry": self.CHANGELOG.replace("1.2.0 (unreleased)", "1.2.0 (2026-01-02)"),
+            "two unreleased entries": self.CHANGELOG.replace("1.1.0 (2026-01-01)", "1.1.0 (unreleased)"),
+            "a TODO": self.CHANGELOG.replace("- Faster.", "- TODO: describe the change"),
+            "no bullet": self.CHANGELOG.replace("- Newer agd.\n- Faster.\n", "Text.\n"),
+            "no version": self.CHANGELOG.replace("1.2.0 (unreleased)", "next (unreleased)"),
+        }
+        for case, changelog in cases.items():
+            self.changelog.write_text(changelog)
+            result = self.release()
+            self.assertNotEqual(result.returncode, 0, case)
+            self.assertIn("CHANGELOG.md", result.stderr, case)
+            self.assertEqual(self.changelog.read_text(), changelog, case)
+            self.assertFalse((self.root / "notes.md").exists(), case)
+
+
 if __name__ == "__main__":
     unittest.main()

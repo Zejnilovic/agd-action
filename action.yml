@@ -1,0 +1,50 @@
+# The inputs and outputs are a contract: renaming or removing one needs v2.
+name: agd update
+description: Keeps a project's agentic setup up to date with agd, through a pull request for each new release of its kits.
+author: Zejnilovic
+branding:
+  icon: refresh-cw
+  color: blue
+
+inputs:
+  mode:
+    description: "pull-request: update and open or update the pull request. check: only set the due output."
+    default: pull-request
+  branch:
+    description: The branch the update is committed to, and the pull request's head.
+    default: agd-update
+  token:
+    description: The token that commits and opens the pull request. A GitHub App's or a person's token makes your checks run on it.
+    default: ${{ github.token }}
+
+outputs:
+  due:
+    description: "true when agd status --check found an update due, else false."
+    value: ${{ steps.check.outputs.due }}
+  pr-number:
+    description: The number of the pull request opened or updated, if any.
+    value: ${{ steps.update.outputs.pr-number }}
+  pr-url:
+    description: The URL of the pull request opened or updated, if any.
+    value: ${{ steps.update.outputs.pr-url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install agd
+      shell: bash
+      run: bash "$GITHUB_ACTION_PATH/scripts/install.sh"
+    - name: Check for a newer setup
+      id: check
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/check.sh"
+    - name: Update and open a pull request
+      id: update
+      if: inputs.mode == 'pull-request' && steps.check.outputs.due == 'true'
+      shell: bash
+      env:
+        BRANCH: ${{ inputs.branch }}
+        GH_TOKEN: ${{ inputs.token }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/update.sh"

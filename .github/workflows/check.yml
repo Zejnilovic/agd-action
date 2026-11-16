@@ -1,0 +1,54 @@
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Syntax
+        run: for script in scripts/*.sh; do bash -n "$script"; done
+      - name: Tests
+        run: python3 -m unittest discover -s tests
+
+  action:
+    # The action itself, with the agd it pins, on a project set up with agentic-defaults: nothing is due,
+    # so neither mode commits or opens a pull request.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: action
+      - name: Install agd
+        run: bash action/scripts/install.sh
+      - name: Set up a project
+        run: |
+          git init -q
+          agd init --yes
+      - name: Check mode
+        id: check
+        uses: ./action
+        with:
+          mode: check
+      - name: Pull-request mode
+        id: update
+        uses: ./action
+      - name: Outputs
+        env:
+          CHECK_DUE: ${{ steps.check.outputs.due }}
+          UPDATE_DUE: ${{ steps.update.outputs.due }}
+          PR_URL: ${{ steps.update.outputs.pr-url }}
+        run: |
+          [ "$CHECK_DUE" = false ] && [ "$UPDATE_DUE" = false ] && [ -z "$PR_URL" ] \
+            || { echo "::error::Expected nothing due and no pull request, got due=$CHECK_DUE/$UPDATE_DUE pr-url=$PR_URL"; exit 1; }

@@ -4,7 +4,7 @@ What changed in agd-action. The next version's changes are collected here; each 
 
 Version numbers follow agd's: a new agd patch release makes a patch release of the action, a minor one a minor release. A new agd major version, or a renamed or removed input or output, makes a major release.
 
-## 1.0.1 (unreleased)
+## 1.0.1 (2026-11-16)
 
 - The first update in a project with no open update pull request no longer fails at `gh pr edit null`: the action opens the pull request.
 
